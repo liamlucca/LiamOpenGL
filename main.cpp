@@ -18,7 +18,7 @@ const char* fragmentShaderSource = "#version 330 core\n"
 "}\n\0";
 
 
-int main() 
+int main()
 {
 	glfwInit(); //Inicializar
 
@@ -30,15 +30,25 @@ int main()
 	/*--------------VERTICES DE UN TRIANGULO EQUILATERO--------------*/
 
 	//Tipo de dato: como un array de float normal pero para opengl (porque el tamaño de la variable se ajusta a opengl)
-	//Estas son las coordenadas de los vertices de un triangulo
+	//Estas son las coordenadas de los vertices de 3 triangulos unidos
 	GLfloat vertices[] =
 	{
-		-0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,
-		0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,
-		0.0f, 0.5f * float(sqrt(3)) * 2 / 3, 0.0f
+		-0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,		// Lower left corner
+		0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,			// Lower right corner
+		0.0f, 0.5f * float(sqrt(3)) * 2 / 3, 0.0f,		// Upper corner
+		-0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f,		// Inner left
+		0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f,		// Inner right
+		0.0f, -0.5f * float(sqrt(3)) / 3, 0.0f			// Inner down
 	};
 
 	/*----------------------------------------------------*/
+
+	GLuint indices[] =
+	{
+		0, 3, 5,		//Triangulo de abajo a la izquierda
+		3, 2, 4,		//Triangulo de abajo a la derecha
+		5, 4, 1			//Triangulo de arriba
+	};
 
 
 	//Creamos la ventana
@@ -94,20 +104,27 @@ int main()
 	
 	//Enviar cosas entre el CPU y GPU es un poco lento, por lo que cuando enviamos cosas, hay que enviarlas en lotes grandes. Esos lotes son los buffers
 	//Solo con los VBO tenemos un objeto con los datos bien empaquetados del vertex pero OpenGL no sabe donde encontrarlo. Para eso vamos a usar otro objeto llamado Vertex Array Object. Esto almacena punteros a uno o mas VBO y le dice a OpenGL como interpretarlos. Los VAO existen para poder cambiar rápidamente entre diferentes VBO.
+	//EBO: tiene que ver con el index buffer: como vamos a dibujar 3 triangulos unidos, ellos comparten los vertices... entonces no queremos que se dupliquen los vertices que comparten los triangulos
 
 	//(VertexBufferObjects) Esto por lo general es un array, pero como solo tenemos un objeto lo dejamos asi
-	GLuint VAO, VBO;
+	GLuint VAO, VBO, EBO;
 	//VAO: Creamos el objeto VertexArrayObject. Debe ir antes que el VBO (MUY IMPORTANTE EL ORDEN)
 	glGenVertexArrays(1, &VAO); 
 	//VBO: Creamos el VertexBufferObject: glGenBuffers(le ponemos 1 de valor porque solo vamos a crear un objeto 3D, &apuntamos a la referencia)
 	glGenBuffers(1, &VBO);
+	//EBO: Creamos el EBO
+	glGenBuffers(1, &EBO);
 	//VAO: Hacemos de un determinado objeto: EL OBJETO ACTUAL. Quiere decir que cuando usemos una funcion que modificaria ese tipo de dato, vamos a modificar el OBJETO ACTUAL (binding object)... de argumento ponemos GL_ARRAY_BUFFER porque ese es el tipo de buffer que necesitamos usar para Vertex Buffer
 	glBindVertexArray(VAO);
 	//VBO: Hacemos de un determinado objeto: EL OBJETO ACTUAL. Quiere decir que cuando usemos una funcion que modificaria ese tipo de dato, vamos a modificar el OBJETO ACTUAL (binding object)... de argumento ponemos GL_ARRAY_BUFFER porque ese es el tipo de buffer que necesitamos usar para Vertex Buffer
 	glBindBuffer(GL_ARRAY_BUFFER, VBO); 
 	//Ahora almacenamos nuestros vertices en el VBO... en el argumento: tipo de buffer, tamaño de los datos en bytes, los datos(vertices), uso de esta data (stream/static/dynamic___draw/read/copy)........ stream: los vertices se modificaran 1 vez y se usaran varias veces; static: los vertices se modificaran una vez y se usaran muchas muchas veces; dinamico: los vertices se modificaran varias veces y se usaran muchas muchas veces.... draw: los vertices se modificaran y se usaran para dibujar una imagen en la pantalla; 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	//Configuramos para que OpenGL sepa como leer VBO. Atributos: el indice atributo del vertice que queremos usar (un atributo vertex es una forma de comunicarse con un vertex shader desde el exterior), cuantos valores tenemos por vertice (en este caso 3 porque tenemos tres floats), el tipo de valores, solo importa si tenemos las coordenadas como numeros enteros (pero como no es el caso lo ponemos en false), paso de nuestros vertices que es la cantidad de datos entre cada vertice (como tenemos 3 floats, es solo de 3 veces el tamaño de un float), offset es un puntero donde commienzan los vertices en la matriz (dado que nuestros vertices comienzan justo al inicio de la matriz, le damos un puntero vacio)
+	//EBO: Hacemos de un determinado objeto: EL OBJETO ACTUAL.
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	//Vinculamos lo anterior a nuestra matriz de indices.
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	//Configuramos para que OpenGL sepa como leer VBO. Atributos: el indice atributo del vertice que queremos usar (un atributo vertex es una forma de comunicarse con un vertex shader desde el exterior), cuantos valores tenemos por vertice (en este caso 3 porque tenemos tres floats), el tipo de valores, solo importa si tenemos las coordenadas como numeros enteros (pero como no es el caso lo ponemos en false), paso de nuestros vertices que es la cantidad de datos entre cada vertice (como tenemos 3 floats, es solo de 3 veces el tamaño de un float), offset es un puntero donde comienzan los vertices en la matriz (dado que nuestros vertices comienzan justo al inicio de la matriz, le damos un puntero vacio)
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	//Ahora habilitamos el atributo vertex para usarlo. Atributo: le ponemos el cero porque es la posicion del indice nuestro atributo Vertex
 	glEnableVertexAttribArray(0);
@@ -115,7 +132,9 @@ int main()
 	//OPCIONAL: es para estar seguro de que no cambiamos accidentalmente un VBO o VAO con una función. Basicamente desvinculamos VBO y VAO, vinculando a cero.
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
-	 
+	//Desbindeamos el EBO despues que el VBO (ya que el EBO esta almacenado en el VBO)
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
 	/*----------------------------------FONDO----------------------------------------*/
 
 	//No confundir con el buffer anterior...
@@ -146,8 +165,8 @@ int main()
 		glUseProgram(shaderProgram);
 		// Vinculamos el VAO para decirle a OPENGL que queremos usarlo. (no es necesario ahcer esto porque solo tenemos un objeto y un VAO, pero es bueno acostumbrarse a esto)
 		glBindVertexArray(VAO);
-		// Funcion de dibujo. Especificamos tipo de primitiva que usaremos (triangulos en este caso), el indice inicial de los vertices (0 en este caso), cantidad de vertecis que queremos dibujar (en este caso 3 porque es un triangulo)
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		// Funcion de dibujo. Especificamos tipo de primitiva que usaremos (triangulos en este caso), cuantos indices queremos usar (9 porque son 3 triangulos), el tipo de dato de los indices, el indice de los indices (en este caso es 0)
+		glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_INT, 0);
 		// Intercambiamos los buffers (back y front) para que la imagen se actualice en cada fotograma
 		glfwSwapBuffers(window);
 
@@ -159,6 +178,7 @@ int main()
 
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
+	glDeleteBuffers(1, &EBO);
 	glDeleteProgram(shaderProgram);
 
 	glfwDestroyWindow(window); //Destruimos la ventana
